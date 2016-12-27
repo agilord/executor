@@ -1,0 +1,131 @@
+// Copyright (c) 2016, Agilord. All rights reserved. Use of this source code
+// is governed by a BSD-style license that can be found in the LICENSE file.
+
+/// This is an alternative implementation of package:pool with fewer tests but
+/// with streaming support. It will get deprecated in favor of `pool` once it
+/// reaches feature parity.
+
+import 'dart:async';
+import 'dart:collection';
+
+/// An async task that completes with a Future.
+typedef Future<R> ExecutorTask<R>();
+
+/// An async task that completes after the Stream is closed.
+typedef Future<R> StreamTask<R>();
+
+/// Executes async tasks concurrently with a configurable parallelism [limit].
+abstract class Executor {
+  /// The maximum number of tasks running concurrently.
+  int limit;
+
+  /// Async task executor.
+  factory Executor({int limit: 1}) => new _Executor(limit);
+
+  /// Schedules an async task and returns with a future that completes when the
+  /// task is finished. Task may not get executed immediately.
+  Future<R> scheduleTask<R>(ExecutorTask<R> task);
+
+  /// Schedules an async task and returns its stream. The task is considered
+  /// running until the stream is closed.
+  Stream<R> scheduleStream<R>(StreamTask<R> task);
+}
+
+class _Executor implements Executor {
+  int _limit;
+  final ListQueue<_Item> _waiting = new ListQueue<_Item>();
+  final ListQueue<_Item> _running = new ListQueue<_Item>();
+  bool _checkScheduled = false;
+
+  _Executor(this._limit) {
+    assert(_limit > 0);
+  }
+
+  @override
+  int get limit => _limit;
+
+  @override
+  set limit(int value) {
+    if (_limit == value) return;
+    assert(value > 0);
+    _limit = value;
+    _triggerCheck();
+  }
+
+  @override
+  Future<R> scheduleTask<R>(ExecutorTask<R> task) {
+    final _Item<R> item = new _Item(task);
+    _waiting.add(item);
+    item.completer.future.whenComplete(() => _triggerCheck());
+    _triggerCheck();
+    return item.completer.future;
+  }
+
+  @override
+  Stream<R> scheduleStream<R>(StreamTask<R> task) {
+    StreamController<R> streamController;
+    StreamSubscription<R> streamSubscription;
+    final Completer resourceCompleter = new Completer();
+    final complete = () {
+      if (streamSubscription != null) {
+        streamSubscription.cancel();
+        streamSubscription = null;
+      }
+      if (!resourceCompleter.isCompleted) {
+        resourceCompleter.complete();
+        streamController.close();
+      }
+    };
+    streamController = new StreamController<R>(onCancel: complete);
+    scheduleTask(() {
+      if (resourceCompleter.isCompleted) return null;
+      new Future.sync(task).then((Stream<R> stream) {
+        if (stream == null) {
+          complete();
+          return null;
+        }
+        streamSubscription = stream.listen(streamController.add,
+            onError: streamController.addError,
+            onDone: complete,
+            cancelOnError: true);
+      }, onError: (e, st) {
+        streamController.addError(e, st);
+        complete();
+      });
+      return resourceCompleter.future;
+    });
+    return streamController.stream;
+  }
+
+  void _triggerCheck() {
+    if (_checkScheduled) return;
+    _checkScheduled = true;
+    scheduleMicrotask(() {
+      _checkScheduled = false;
+      _check();
+    });
+  }
+
+  void _check() {
+    for (;;) {
+      if (_waiting.isEmpty) return;
+      if (_running.length >= _limit) return;
+      final _Item item = _waiting.removeFirst();
+      _running.add(item);
+      item.completer.future.whenComplete(() {
+        _running.remove(item);
+      });
+      try {
+        item.completer.complete(item.task());
+      } catch (e, st) {
+        item.completer.completeError(e, st);
+      }
+    }
+  }
+}
+
+class _Item<R> {
+  final ExecutorTask<R> task;
+  final Completer<R> completer = new Completer<R>();
+  _Item(this.task);
+}
