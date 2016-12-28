@@ -12,7 +12,8 @@ import 'dart:collection';
 typedef Future<R> ExecutorTask<R>();
 
 /// An async task that completes after the Stream is closed.
-typedef Future<R> StreamTask<R>();
+/// [onComplete] can be used to release resources after the stream is closed.
+typedef Stream<R> StreamTask<R>(Future onComplete);
 
 /// Executes async tasks concurrently with a configurable parallelism [limit].
 abstract class Executor {
@@ -73,13 +74,25 @@ class _Executor implements Executor {
       }
       if (!resourceCompleter.isCompleted) {
         resourceCompleter.complete();
+      }
+      if (!streamController.isClosed) {
         streamController.close();
       }
     };
-    streamController = new StreamController<R>(onCancel: complete);
+    final completeWithError = (e, st) {
+      if (!streamController.isClosed) {
+        streamController.addError(e, st);
+      }
+      complete();
+    };
+    streamController = new StreamController<R>(
+        onCancel: complete,
+        onPause: () => streamSubscription?.pause(),
+        onResume: () => streamSubscription?.resume());
     scheduleTask(() {
       if (resourceCompleter.isCompleted) return null;
-      new Future.sync(task).then((Stream<R> stream) {
+      try {
+        final Stream<R> stream = task(resourceCompleter.future);
         if (stream == null) {
           complete();
           return null;
@@ -88,12 +101,11 @@ class _Executor implements Executor {
             onError: streamController.addError,
             onDone: complete,
             cancelOnError: true);
-      }, onError: (e, st) {
-        streamController.addError(e, st);
-        complete();
-      });
+      } catch (e, st) {
+        completeWithError(e, st);
+      }
       return resourceCompleter.future;
-    });
+    }).catchError(completeWithError);
     return streamController.stream;
   }
 
