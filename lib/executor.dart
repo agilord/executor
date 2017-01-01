@@ -29,6 +29,9 @@ abstract class Executor {
   /// Schedules an async task and returns its stream. The task is considered
   /// running until the stream is closed.
   Stream<R> scheduleStream<R>(StreamTask<R> task);
+
+  /// Closes the executor and reject new tasks.
+  Future close();
 }
 
 class _Executor implements Executor {
@@ -36,10 +39,13 @@ class _Executor implements Executor {
   final ListQueue<_Item> _waiting = new ListQueue<_Item>();
   final ListQueue<_Item> _running = new ListQueue<_Item>();
   bool _checkScheduled = false;
+  Completer _closeCompleter;
 
   _Executor(this._limit) {
     assert(_limit > 0);
   }
+
+  bool get isClosing => _closeCompleter != null;
 
   @override
   int get limit => _limit;
@@ -54,6 +60,7 @@ class _Executor implements Executor {
 
   @override
   Future<R> scheduleTask<R>(ExecutorTask<R> task) {
+    if (isClosing) throw new Exception('Executor doesn\'t accept new tasks.');
     final _Item<R> item = new _Item(task);
     _waiting.add(item);
     item.completer.future.whenComplete(() => _triggerCheck());
@@ -108,6 +115,14 @@ class _Executor implements Executor {
     return streamController.stream;
   }
 
+  @override
+  Future close() {
+    if (!isClosing) {
+      _closeCompleter = new Completer();
+    }
+    return _closeCompleter.future;
+  }
+
   void _triggerCheck() {
     if (_checkScheduled) return;
     _checkScheduled = true;
@@ -119,12 +134,17 @@ class _Executor implements Executor {
 
   void _check() {
     for (;;) {
+      if (isClosing && _waiting.isEmpty && _running.isEmpty) {
+        _closeCompleter.complete();
+        return;
+      }
       if (_waiting.isEmpty) return;
       if (_running.length >= _limit) return;
       final _Item item = _waiting.removeFirst();
       _running.add(item);
       item.completer.future.whenComplete(() {
         _running.remove(item);
+        _triggerCheck();
       });
       try {
         item.completer.complete(item.task());
