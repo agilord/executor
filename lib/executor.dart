@@ -7,6 +7,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' show max;
 
 /// An async task that completes with a Future.
 typedef Future<R> ExecutorTask<R>();
@@ -55,17 +56,22 @@ class Rate {
 /// Executes async tasks concurrently with a configurable parallelism [limit].
 abstract class Executor {
   /// The maximum number of tasks running concurrently.
+  @Deprecated('Use concurrency instead.')
   int limit;
+
+  /// The maximum number of tasks running concurrently.
+  int concurrency;
 
   /// The rate of how frequently tasks can be started.
   Rate startRate;
 
   /// Async task executor.
   factory Executor({
-    int limit: 1,
+    @Deprecated('Use concurrency instead.') int limit: 1,
+    int concurrency: 1,
     Rate startRate,
   }) =>
-      new _Executor(limit, startRate);
+      new _Executor(max(limit, concurrency), startRate);
 
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
@@ -80,7 +86,7 @@ abstract class Executor {
 }
 
 class _Executor implements Executor {
-  int _limit;
+  int _concurrency;
   Rate _startRate;
   final ListQueue<_Item> _waiting = new ListQueue<_Item>();
   final ListQueue<_Item> _running = new ListQueue<_Item>();
@@ -88,20 +94,28 @@ class _Executor implements Executor {
   Timer _checkTimer;
   Completer _closeCompleter;
 
-  _Executor(this._limit, this._startRate) {
-    assert(_limit > 0);
+  _Executor(this._concurrency, this._startRate) {
+    assert(_concurrency > 0);
   }
 
   bool get isClosing => _closeCompleter != null;
 
   @override
-  int get limit => _limit;
+  int get limit => concurrency;
 
   @override
   set limit(int value) {
-    if (_limit == value) return;
+    concurrency = value;
+  }
+
+  @override
+  int get concurrency => _concurrency;
+
+  @override
+  set concurrency(int value) {
+    if (_concurrency == value) return;
     assert(value > 0);
-    _limit = value;
+    _concurrency = value;
     _triggerCheck();
   }
 
@@ -199,7 +213,7 @@ class _Executor implements Executor {
         return;
       }
       if (_waiting.isEmpty) return;
-      if (_running.length >= _limit) return;
+      if (_running.length >= _concurrency) return;
       final DateTime now = new DateTime.now();
       if (_startRate != null) {
         final DateTime limitStart = now.subtract(_startRate.period);
