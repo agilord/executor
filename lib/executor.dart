@@ -15,9 +15,9 @@ typedef Future<R> ExecutorTask<R>();
 /// An async task that completes after the Stream is closed.
 typedef Stream<R> StreamTask<R>();
 
-/// Defines the rate [limit] to obey over a given [period].
+/// No more than [limit] number of tasks can be started over any given [period].
 class Rate {
-  /// The maximum number of tasks to execute in the given [period].
+  /// The maximum number of tasks to start in any given [period].
   final int limit;
 
   /// The period of the rate limit.
@@ -53,7 +53,7 @@ class Rate {
   }
 }
 
-/// Executes async tasks concurrently with a configurable parallelism [limit].
+/// Executes async tasks with a configurable maximum [concurrency] and [rate].
 abstract class Executor {
   /// The maximum number of tasks running concurrently.
   @Deprecated('Use concurrency instead.')
@@ -62,16 +62,16 @@ abstract class Executor {
   /// The maximum number of tasks running concurrently.
   int concurrency;
 
-  /// The rate of how frequently tasks can be started.
-  Rate startRate;
+  /// The maximum rate of how frequently tasks can be started.
+  Rate rate;
 
   /// Async task executor.
   factory Executor({
     @Deprecated('Use concurrency instead.') int limit: 1,
     int concurrency: 1,
-    Rate startRate,
+    Rate rate,
   }) =>
-      new _Executor(max(limit, concurrency), startRate);
+      new _Executor(max(limit, concurrency), rate);
 
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
@@ -87,14 +87,14 @@ abstract class Executor {
 
 class _Executor implements Executor {
   int _concurrency;
-  Rate _startRate;
+  Rate _rate;
   final ListQueue<_Item> _waiting = new ListQueue<_Item>();
   final ListQueue<_Item> _running = new ListQueue<_Item>();
   final ListQueue<DateTime> _started = new ListQueue<DateTime>();
   Timer _checkTimer;
   Completer _closeCompleter;
 
-  _Executor(this._concurrency, this._startRate) {
+  _Executor(this._concurrency, this._rate) {
     assert(_concurrency > 0);
   }
 
@@ -120,12 +120,12 @@ class _Executor implements Executor {
   }
 
   @override
-  Rate get startRate => _startRate;
+  Rate get rate => _rate;
 
   @override
-  set startRate(Rate value) {
-    if (_startRate == value) return;
-    _startRate = value;
+  set rate(Rate value) {
+    if (_rate == value) return;
+    _rate = value;
     _triggerCheck(force: true);
   }
 
@@ -215,13 +215,13 @@ class _Executor implements Executor {
       if (_waiting.isEmpty) return;
       if (_running.length >= _concurrency) return;
       final DateTime now = new DateTime.now();
-      if (_startRate != null) {
-        final DateTime limitStart = now.subtract(_startRate.period);
+      if (_rate != null) {
+        final DateTime limitStart = now.subtract(_rate.period);
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
         }
-        if (_started.length >= _startRate.limit) {
-          final diff = _startRate.period - now.difference(_started.first);
+        if (_started.length >= _rate.limit) {
+          final diff = _rate.period - now.difference(_started.first);
           _triggerCheck(sleep: diff);
           return;
         }
