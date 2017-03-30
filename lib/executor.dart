@@ -14,13 +14,58 @@ typedef Future<R> ExecutorTask<R>();
 /// An async task that completes after the Stream is closed.
 typedef Stream<R> StreamTask<R>();
 
+/// Defines the rate [limit] to obey over a given [period].
+class Rate {
+  /// The maximum number of tasks to execute in the given [period].
+  final int limit;
+
+  /// The period of the rate limit.
+  final Duration period;
+
+  /// Creates a rate limit.
+  const Rate(this.limit, this.period);
+
+  /// Creates a rate limit per second.
+  factory Rate.perSecond(int limit) =>
+      new Rate(limit, new Duration(seconds: 1));
+
+  /// Creates a rate limit per minute.
+  factory Rate.perMinute(int limit) =>
+      new Rate(limit, new Duration(minutes: 1));
+
+  /// Creates a rate limit per hour.
+  factory Rate.perHour(int limit) => new Rate(limit, new Duration(hours: 1));
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is Rate &&
+        this.limit == other.limit &&
+        this.period == other.period;
+  }
+
+  @override
+  int get hashCode {
+    return limit.hashCode ^ period.hashCode;
+  }
+}
+
 /// Executes async tasks concurrently with a configurable parallelism [limit].
 abstract class Executor {
   /// The maximum number of tasks running concurrently.
   int limit;
 
+  /// The rate of how frequently tasks can be started.
+  Rate startRate;
+
   /// Async task executor.
-  factory Executor({int limit: 1}) => new _Executor(limit);
+  factory Executor({
+    int limit: 1,
+    Rate startRate,
+  }) =>
+      new _Executor(limit, startRate);
 
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
@@ -36,12 +81,14 @@ abstract class Executor {
 
 class _Executor implements Executor {
   int _limit;
+  Rate _startRate;
   final ListQueue<_Item> _waiting = new ListQueue<_Item>();
   final ListQueue<_Item> _running = new ListQueue<_Item>();
-  bool _checkScheduled = false;
+  final ListQueue<DateTime> _started = new ListQueue<DateTime>();
+  Timer _checkTimer;
   Completer _closeCompleter;
 
-  _Executor(this._limit) {
+  _Executor(this._limit, this._startRate) {
     assert(_limit > 0);
   }
 
@@ -56,6 +103,16 @@ class _Executor implements Executor {
     assert(value > 0);
     _limit = value;
     _triggerCheck();
+  }
+
+  @override
+  Rate get startRate => _startRate;
+
+  @override
+  set startRate(Rate value) {
+    if (_startRate == value) return;
+    _startRate = value;
+    _triggerCheck(force: true);
   }
 
   @override
@@ -123,11 +180,14 @@ class _Executor implements Executor {
     return _closeCompleter.future;
   }
 
-  void _triggerCheck() {
-    if (_checkScheduled) return;
-    _checkScheduled = true;
-    scheduleMicrotask(() {
-      _checkScheduled = false;
+  void _triggerCheck({Duration sleep, bool force: false}) {
+    if (force && _checkTimer != null) {
+      _checkTimer.cancel();
+      _checkTimer = null;
+    }
+    if (_checkTimer != null) return;
+    _checkTimer = new Timer(sleep ?? Duration.ZERO, () {
+      _checkTimer = null;
       _check();
     });
   }
@@ -140,6 +200,19 @@ class _Executor implements Executor {
       }
       if (_waiting.isEmpty) return;
       if (_running.length >= _limit) return;
+      final DateTime now = new DateTime.now();
+      if (_startRate != null) {
+        final DateTime limitStart = now.subtract(_startRate.period);
+        while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
+          _started.removeFirst();
+        }
+        if (_started.length >= _startRate.limit) {
+          final diff = _startRate.period - now.difference(_started.first);
+          _triggerCheck(sleep: diff);
+          return;
+        }
+        _started.add(now);
+      }
       final _Item item = _waiting.removeFirst();
       _running.add(item);
       item.completer.future.whenComplete(() {

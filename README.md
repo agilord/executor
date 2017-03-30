@@ -1,12 +1,10 @@
 # Async task executor for Dart
 
-Executes async tasks concurrently with a configurable parallelism limit.
+Executes async tasks concurrently with a configurable parallelism and start-rate limit.
 
 This is an alternative implementation of the Dart team's
 [pool](https://github.com/dart-lang/pool) library with fewer tests,
-but with streaming support.
-
-It will get deprecated in favor of `pool` once it reaches feature parity.
+but with additional features.
 
 ## Usage
 
