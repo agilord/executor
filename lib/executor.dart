@@ -191,6 +191,7 @@ class _Executor implements Executor {
     if (!isClosing) {
       _closeCompleter = new Completer();
     }
+    _triggerCheck();
     return _closeCompleter.future;
   }
 
