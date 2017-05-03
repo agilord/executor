@@ -73,6 +73,15 @@ abstract class Executor {
   }) =>
       new _Executor(max(limit, concurrency), rate);
 
+  /// The number of tasks that are currently running.
+  int get runningCount;
+
+  /// The number of tasks that are currently waiting to be started.
+  int get waitingCount;
+
+  /// The total number of tasks scheduled (running + waiting).
+  int get scheduledCount;
+
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
   Future<R> scheduleTask<R>(ExecutorTask<R> task);
@@ -80,6 +89,12 @@ abstract class Executor {
   /// Schedules an async task and returns its stream. The task is considered
   /// running until the stream is closed.
   Stream<R> scheduleStream<R>(StreamTask<R> task);
+
+  /// Returns a [Future] that completes when all currently running tasks
+  /// complete.
+  ///
+  /// If [withWaiting] is set, it will include the waiting tasks too.
+  Future join({bool withWaiting: false});
 
   /// Closes the executor and reject new tasks.
   Future close();
@@ -97,6 +112,15 @@ class _Executor implements Executor {
   _Executor(this._concurrency, this._rate) {
     assert(_concurrency > 0);
   }
+
+  @override
+  int get runningCount => _running.length;
+
+  @override
+  int get waitingCount => _waiting.length;
+
+  @override
+  int get scheduledCount => runningCount + waitingCount;
 
   bool get isClosing => _closeCompleter != null;
 
@@ -184,6 +208,21 @@ class _Executor implements Executor {
       return resourceCompleter.future;
     }).catchError(completeWithError);
     return streamController.stream;
+  }
+
+  @override
+  Future join({bool withWaiting: false}) {
+    final List<Future> futures = [];
+    for (_Item item in _running) {
+      futures.add(item.completer.future.whenComplete(() => null));
+    }
+    if (withWaiting) {
+      for (_Item item in _waiting) {
+        futures.add(item.completer.future.whenComplete(() => null));
+      }
+    }
+    if (futures.isEmpty) return new Future.value();
+    return Future.wait(futures);
   }
 
   @override
