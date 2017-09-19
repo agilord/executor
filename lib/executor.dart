@@ -1,9 +1,7 @@
 // Copyright (c) 2016, Agilord. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
-/// This is an alternative implementation of package:pool with fewer tests but
-/// with streaming support. It will get deprecated in favor of `pool` once it
-/// reaches feature parity.
+/// Executes async tasks with a configurable maximum concurrency and rate.
 
 import 'dart:async';
 import 'dart:collection';
@@ -73,7 +71,7 @@ abstract class Executor {
   /// The number of tasks that are currently waiting to be started.
   int get waitingCount;
 
-  /// The total number of tasks scheduled (running + waiting).
+  /// The total number of tasks scheduled ([runningCount] + [waitingCount]).
   int get scheduledCount;
 
   /// Schedules an async task and returns with a future that completes when the
