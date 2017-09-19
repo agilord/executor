@@ -15,6 +15,7 @@
 **Housekeeping**
 
 - Added example.
+- Added a few tests.
 
 ## 0.1.2
 

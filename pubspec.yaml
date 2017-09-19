@@ -8,3 +8,6 @@ homepage: https://github.com/agilord/executor
 
 environment:
   sdk: '>=1.0.0 <2.0.0'
+
+dev_dependencies:
+  test: ^0.12.24
