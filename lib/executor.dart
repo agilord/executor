@@ -85,6 +85,14 @@ abstract class Executor {
   /// If [withWaiting] is set, it will include the waiting tasks too.
   Future join({bool withWaiting: false});
 
+  /// Notifies the listeners about a state change in [Executor], for example:
+  /// - one or more tasks have started
+  /// - one or more tasks have completed
+  ///
+  /// Clients can use this to monitor [scheduledCount] and queue more tasks to
+  /// ensure [Executor] is running on full capacity.
+  Stream get onChange;
+
   /// Closes the executor and reject new tasks.
   Future close();
 }
@@ -95,6 +103,8 @@ class _Executor implements Executor {
   final ListQueue<_Item> _waiting = new ListQueue<_Item>();
   final ListQueue<_Item> _running = new ListQueue<_Item>();
   final ListQueue<DateTime> _started = new ListQueue<DateTime>();
+  final StreamController _onChangeController = new StreamController.broadcast();
+  Timer _changeTimer;
   Timer _checkTimer;
   Completer _closeCompleter;
 
@@ -207,11 +217,15 @@ class _Executor implements Executor {
   }
 
   @override
+  Stream get onChange => _onChangeController.stream;
+
+  @override
   Future close() {
     if (!isClosing) {
       _closeCompleter = new Completer();
     }
     _triggerCheck();
+    _onChangeController.close();
     return _closeCompleter.future;
   }
 
@@ -252,6 +266,7 @@ class _Executor implements Executor {
       _running.add(item);
       item.completer.future.whenComplete(() {
         _running.remove(item);
+        _notifyChange();
         _triggerCheck();
       });
       try {
@@ -259,7 +274,19 @@ class _Executor implements Executor {
       } catch (e, st) {
         item.completer.completeError(e, st);
       }
+      _notifyChange();
     }
+  }
+
+  void _notifyChange() {
+    if (_changeTimer != null) return;
+    _changeTimer = new Timer(Duration.ZERO, () {
+      _changeTimer = null;
+      if (isClosing) return;
+      if (!_onChangeController.isClosed) {
+        _onChangeController.add(null);
+      }
+    });
   }
 }
 
