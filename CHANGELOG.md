@@ -1,5 +1,11 @@
 # Changelog
 
+## [next major release]
+
+**Breaking changes**
+
+- Removed deprecated member `limit`.
+
 ## 0.1.2
 
 - Expose internal stats: `runningCount`, `waitingCount`, `scheduledCount`.

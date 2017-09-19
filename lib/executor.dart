@@ -7,7 +7,6 @@
 
 import 'dart:async';
 import 'dart:collection';
-import 'dart:math' show max;
 
 /// An async task that completes with a Future.
 typedef Future<R> ExecutorTask<R>();
@@ -56,10 +55,6 @@ class Rate {
 /// Executes async tasks with a configurable maximum [concurrency] and [rate].
 abstract class Executor {
   /// The maximum number of tasks running concurrently.
-  @Deprecated('Use concurrency instead.')
-  int limit;
-
-  /// The maximum number of tasks running concurrently.
   int concurrency;
 
   /// The maximum rate of how frequently tasks can be started.
@@ -67,11 +62,10 @@ abstract class Executor {
 
   /// Async task executor.
   factory Executor({
-    @Deprecated('Use concurrency instead.') int limit: 1,
     int concurrency: 1,
     Rate rate,
   }) =>
-      new _Executor(max(limit, concurrency), rate);
+      new _Executor(concurrency, rate);
 
   /// The number of tasks that are currently running.
   int get runningCount;
@@ -123,14 +117,6 @@ class _Executor implements Executor {
   int get scheduledCount => runningCount + waitingCount;
 
   bool get isClosing => _closeCompleter != null;
-
-  @override
-  int get limit => concurrency;
-
-  @override
-  set limit(int value) {
-    concurrency = value;
-  }
 
   @override
   int get concurrency => _concurrency;
