@@ -6,6 +6,7 @@
 
 - Removed deprecated member `limit`.
 - Renamed `ExecutorTask` -> `AsyncTask`, return value to `FutureOr`.
+- Renamed `Rate.limit` -> `Rate.maximum`.
 
 ## 0.1.2
 

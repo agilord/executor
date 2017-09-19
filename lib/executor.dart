@@ -12,42 +12,39 @@ typedef FutureOr<R> AsyncTask<R>();
 /// An async task that completes after the Stream is closed.
 typedef Stream<R> StreamTask<R>();
 
-/// No more than [limit] number of tasks can be started over any given [period].
+/// No more than [maximum] tasks can be started over any given [period].
 class Rate {
   /// The maximum number of tasks to start in any given [period].
-  final int limit;
+  final int maximum;
 
-  /// The period of the rate limit.
+  /// The period of the [Rate], in which [maximum] tasks can be started.
   final Duration period;
 
   /// Creates a rate limit.
-  const Rate(this.limit, this.period);
+  const Rate(this.maximum, this.period);
 
   /// Creates a rate limit per second.
-  factory Rate.perSecond(int limit) =>
-      new Rate(limit, new Duration(seconds: 1));
+  factory Rate.perSecond(int maximum) =>
+      new Rate(maximum, new Duration(seconds: 1));
 
   /// Creates a rate limit per minute.
-  factory Rate.perMinute(int limit) =>
-      new Rate(limit, new Duration(minutes: 1));
+  factory Rate.perMinute(int maximum) =>
+      new Rate(maximum, new Duration(minutes: 1));
 
   /// Creates a rate limit per hour.
-  factory Rate.perHour(int limit) => new Rate(limit, new Duration(hours: 1));
+  factory Rate.perHour(int maximum) =>
+      new Rate(maximum, new Duration(hours: 1));
 
   @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) {
-      return true;
-    }
-    return other is Rate &&
-        this.limit == other.limit &&
-        this.period == other.period;
-  }
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Rate &&
+          runtimeType == other.runtimeType &&
+          maximum == other.maximum &&
+          period == other.period;
 
   @override
-  int get hashCode {
-    return limit.hashCode ^ period.hashCode;
-  }
+  int get hashCode => maximum.hashCode ^ period.hashCode;
 }
 
 /// Executes async tasks with a configurable maximum [concurrency] and [rate].
@@ -244,7 +241,7 @@ class _Executor implements Executor {
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
         }
-        if (_started.length >= _rate.limit) {
+        if (_started.length >= _rate.maximum) {
           final diff = _rate.period - now.difference(_started.first);
           _triggerCheck(sleep: diff);
           return;
