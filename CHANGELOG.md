@@ -12,6 +12,10 @@
 
 - Added `Executor.onChange`. Clients can use this to monitor the current `scheduledCount` and queue more tasks to ensure `Executor` is running on full capacity.
 
+**Housekeeping**
+
+- Added example.
+
 ## 0.1.2
 
 - Expose internal stats: `runningCount`, `waitingCount`, `scheduledCount`.
