@@ -2,9 +2,6 @@
 
 Executes async tasks with a configurable maximum concurrency and rate.
 
-This is an alternative implementation of the Dart team's
-[pool](https://github.com/dart-lang/pool) library. 
-
 ## Usage
 
 A simple usage example:
@@ -28,6 +25,9 @@ A simple usage example:
 
 - [source code][source]
 - contributors: [Agilord][agilord]
+- Related projects:
+  - Alternative: the Dart team's [pool](https://pub.dartlang.org/packages/pool) library.
+  - Database executor: [db_executor](https://pub.dartlang.org/packages/db_executor) (from the same authors as this projects)
 
 [source]: https://github.com/agilord/db_executor
 [agilord]: https://www.agilord.com/

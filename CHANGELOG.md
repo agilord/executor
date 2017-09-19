@@ -1,6 +1,6 @@
 # Changelog
 
-## [next major release]
+## 1.0.0
 
 **Breaking changes**
 
