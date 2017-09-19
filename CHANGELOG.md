@@ -5,6 +5,7 @@
 **Breaking changes**
 
 - Removed deprecated member `limit`.
+- Renamed `ExecutorTask` -> `AsyncTask`, return value to `FutureOr`.
 
 ## 0.1.2
 

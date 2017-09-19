@@ -8,8 +8,8 @@
 import 'dart:async';
 import 'dart:collection';
 
-/// An async task that completes with a Future.
-typedef Future<R> ExecutorTask<R>();
+/// An async task that completes with a Future or a value.
+typedef FutureOr<R> AsyncTask<R>();
 
 /// An async task that completes after the Stream is closed.
 typedef Stream<R> StreamTask<R>();
@@ -78,7 +78,7 @@ abstract class Executor {
 
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
-  Future<R> scheduleTask<R>(ExecutorTask<R> task);
+  Future<R> scheduleTask<R>(AsyncTask<R> task);
 
   /// Schedules an async task and returns its stream. The task is considered
   /// running until the stream is closed.
@@ -140,7 +140,7 @@ class _Executor implements Executor {
   }
 
   @override
-  Future<R> scheduleTask<R>(ExecutorTask<R> task) {
+  Future<R> scheduleTask<R>(AsyncTask<R> task) {
     if (isClosing) throw new Exception('Executor doesn\'t accept new tasks.');
     final _Item<R> item = new _Item(task);
     _waiting.add(item);
@@ -269,7 +269,7 @@ class _Executor implements Executor {
 }
 
 class _Item<R> {
-  final ExecutorTask<R> task;
+  final AsyncTask<R> task;
   final Completer<R> completer = new Completer<R>();
   _Item(this.task);
 }
