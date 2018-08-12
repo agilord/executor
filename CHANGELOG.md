@@ -1,5 +1,9 @@
 # Changelog
 
+@@ 2.0.0
+
+- Supporting Dart 2 only.
+
 ## 1.0.1
 
 - Dart2 compatibility with `package:dart2_constant`.

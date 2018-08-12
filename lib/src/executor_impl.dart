@@ -138,7 +138,7 @@ class _Executor implements Executor {
       _checkTimer = null;
     }
     if (_checkTimer != null) return;
-    _checkTimer = new Timer(sleep ?? core.Duration.zero, () {
+    _checkTimer = new Timer(sleep ?? Duration.zero, () {
       _checkTimer = null;
       _check();
     });
@@ -183,7 +183,7 @@ class _Executor implements Executor {
 
   void _notifyChange() {
     if (_changeTimer != null) return;
-    _changeTimer = new Timer(core.Duration.zero, () {
+    _changeTimer = new Timer(Duration.zero, () {
       _changeTimer = null;
       if (isClosing) return;
       if (!_onChangeController.isClosed) {

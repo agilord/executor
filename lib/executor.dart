@@ -8,8 +8,6 @@ library executor;
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:dart2_constant/core.dart' as core;
-
 part './src/executor_impl.dart';
 
 /// An async task that completes with a Future or a value.
