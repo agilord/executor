@@ -7,12 +7,14 @@ class _Executor implements Executor {
   final ListQueue<_Item> _running = new ListQueue<_Item>();
   final ListQueue<DateTime> _started = new ListQueue<DateTime>();
   final StreamController _onChangeController = new StreamController.broadcast();
-  Timer _changeTimer;
-  Timer _checkTimer;
-  Completer _closeCompleter;
+  Future _runFuture;
+  bool _closing = false;
+  Completer _notifyCompleter;
+  Timer _notifyTimer;
 
   _Executor(this._concurrency, this._rate) {
     assert(_concurrency > 0);
+    _runFuture = _run();
   }
 
   @override
@@ -24,7 +26,7 @@ class _Executor implements Executor {
   @override
   int get scheduledCount => runningCount + waitingCount;
 
-  bool get isClosing => _closeCompleter != null;
+  bool get isClosing => _closing;
 
   @override
   int get concurrency => _concurrency;
@@ -34,7 +36,7 @@ class _Executor implements Executor {
     if (_concurrency == value) return;
     assert(value > 0);
     _concurrency = value;
-    _triggerCheck();
+    _doNotify();
   }
 
   @override
@@ -44,7 +46,7 @@ class _Executor implements Executor {
   set rate(Rate value) {
     if (_rate == value) return;
     _rate = value;
-    _triggerCheck(force: true);
+    _doNotify();
   }
 
   @override
@@ -52,8 +54,8 @@ class _Executor implements Executor {
     if (isClosing) throw new Exception('Executor doesn\'t accept new tasks.');
     final _Item<R> item = new _Item(task);
     _waiting.add(item);
-    item.completer.future.whenComplete(() => _triggerCheck());
-    _triggerCheck();
+    item.completer.future.whenComplete(() => _doNotify());
+    _doNotify();
     return item.completer.future;
   }
 
@@ -123,73 +125,74 @@ class _Executor implements Executor {
   Stream get onChange => _onChangeController.stream;
 
   @override
-  Future close() {
-    if (!isClosing) {
-      _closeCompleter = new Completer();
-    }
-    _triggerCheck();
-    _onChangeController.close();
-    return _closeCompleter.future;
+  Future close() async {
+    _closing = true;
+    _doNotify();
+    await _runFuture;
+    await _onChangeController.close();
   }
 
-  void _triggerCheck({Duration sleep, bool force: false}) {
-    if (force && _checkTimer != null) {
-      _checkTimer.cancel();
-      _checkTimer = null;
-    }
-    if (_checkTimer != null) return;
-    _checkTimer = new Timer(sleep ?? Duration.zero, () {
-      _checkTimer = null;
-      _check();
-    });
-  }
-
-  void _check() {
+  Future _run() async {
     for (;;) {
       if (isClosing && _waiting.isEmpty && _running.isEmpty) {
-        _closeCompleter.complete();
         return;
       }
-      if (_waiting.isEmpty) return;
-      if (_running.length >= _concurrency) return;
-      final DateTime now = new DateTime.now();
+      if (_waiting.isEmpty || _running.length >= _concurrency) {
+        await _waitForNotify();
+        continue;
+      }
       if (_rate != null) {
+        final DateTime now = new DateTime.now();
         final DateTime limitStart = now.subtract(_rate.period);
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
         }
-        if (_started.length >= _rate.maximum) {
-          final diff = _rate.period - now.difference(_started.first);
-          _triggerCheck(sleep: diff);
-          return;
+        if (_started.isNotEmpty) {
+          final gap = _rate.period ~/ _rate.maximum;
+          final last = now.difference(_started.last);
+          if (gap > last) {
+            final diff = gap - last;
+            _notifyTimer ??= new Timer(diff, _doNotify);
+            await _waitForNotify();
+            continue;
+          }
         }
         _started.add(now);
       }
       final _Item item = _waiting.removeFirst();
       _running.add(item);
+      // ignore: unawaited_futures
       item.completer.future.whenComplete(() {
         _running.remove(item);
-        _notifyChange();
-        _triggerCheck();
+        _doNotify();
+        if (!_closing &&
+            _onChangeController.hasListener &&
+            !_onChangeController.isClosed) {
+          _onChangeController.add(null);
+        }
       });
       try {
         item.completer.complete(item.task());
       } catch (e, st) {
         item.completer.completeError(e, st);
       }
-      _notifyChange();
+      _doNotify();
     }
   }
 
-  void _notifyChange() {
-    if (_changeTimer != null) return;
-    _changeTimer = new Timer(Duration.zero, () {
-      _changeTimer = null;
-      if (isClosing) return;
-      if (!_onChangeController.isClosed) {
-        _onChangeController.add(null);
-      }
-    });
+  void _doNotify() {
+    _notifyCompleter?.complete();
+    _notifyCompleter = null;
+    _notifyTimer?.cancel();
+    _notifyTimer = null;
+  }
+
+  Future _waitForNotify() async {
+    _notifyCompleter = new Completer();
+    await _notifyCompleter.future;
+    _notifyCompleter = null;
+    _notifyTimer?.cancel();
+    _notifyTimer = null;
   }
 }
 

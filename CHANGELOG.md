@@ -1,6 +1,11 @@
 # Changelog
 
-@@ 2.0.0
+## 2.1.0
+
+- Removed `Timer`s to schedule tasks, using a simple loop instead.
+- Better distribution for rate-limited executions.
+
+## 2.0.0
 
 - Supporting Dart 2 only.
 
