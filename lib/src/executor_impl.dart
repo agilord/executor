@@ -50,13 +50,18 @@ class _Executor implements Executor {
   }
 
   @override
-  Future<R> scheduleTask<R>(AsyncTask<R> task) {
+  Future<R> scheduleTask<R>(AsyncTask<R> task) async {
     if (isClosing) throw new Exception('Executor doesn\'t accept new tasks.');
-    final _Item<R> item = new _Item(task);
+    final item = new _Item();
     _waiting.add(item);
-    item.completer.future.whenComplete(() => _doNotify());
     _doNotify();
-    return item.completer.future;
+    await item.trigger.future;
+    try {
+      return await task();
+    } finally {
+      item.finalizer.complete();
+      _doNotify();
+    }
   }
 
   @override
@@ -110,11 +115,11 @@ class _Executor implements Executor {
   Future join({bool withWaiting: false}) {
     final List<Future> futures = [];
     for (_Item item in _running) {
-      futures.add(item.completer.future.whenComplete(() => null));
+      futures.add(item.finalizer.future.whenComplete(() => null));
     }
     if (withWaiting) {
       for (_Item item in _waiting) {
-        futures.add(item.completer.future.whenComplete(() => null));
+        futures.add(item.finalizer.future.whenComplete(() => null));
       }
     }
     if (futures.isEmpty) return new Future.value();
@@ -162,7 +167,7 @@ class _Executor implements Executor {
       final _Item item = _waiting.removeFirst();
       _running.add(item);
       // ignore: unawaited_futures
-      item.completer.future.whenComplete(() {
+      item.finalizer.future.whenComplete(() {
         _running.remove(item);
         _doNotify();
         if (!_closing &&
@@ -171,11 +176,7 @@ class _Executor implements Executor {
           _onChangeController.add(null);
         }
       });
-      try {
-        item.completer.complete(item.task());
-      } catch (e, st) {
-        item.completer.completeError(e, st);
-      }
+      item.trigger.complete();
       _doNotify();
     }
   }
@@ -196,8 +197,7 @@ class _Executor implements Executor {
   }
 }
 
-class _Item<R> {
-  final AsyncTask<R> task;
-  final Completer<R> completer = new Completer<R>();
-  _Item(this.task);
+class _Item {
+  final Completer trigger = new Completer();
+  final Completer finalizer = new Completer();
 }

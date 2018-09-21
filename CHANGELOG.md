@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+
+- Improved design on loop and scheduling, preserving caller stacktrace with full details.
+
 ## 2.1.0
 
 - Removed `Timer`s to schedule tasks, using a simple loop instead.
