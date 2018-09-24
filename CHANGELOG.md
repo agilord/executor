@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.2
+
+- Using `package:stack_trace` to chain async stacktraces when task fails.
+
 ## 2.1.1
 
 - Improved design on loop and scheduling, preserving caller stacktrace with full details.

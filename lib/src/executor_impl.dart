@@ -56,12 +56,17 @@ class _Executor implements Executor {
     _waiting.add(item);
     _doNotify();
     await item.trigger.future;
+    final completer = Completer<R>();
     try {
-      return await task();
-    } finally {
-      item.finalizer.complete();
-      _doNotify();
+      final r = await task();
+      completer.complete(r);
+    } catch (e, st) {
+      final chain = new Chain([new Trace.from(st), new Trace.current(1)]);
+      completer.completeError(e, chain);
     }
+    item.finalizer.complete();
+    _doNotify();
+    return completer.future;
   }
 
   @override
