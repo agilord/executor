@@ -30,16 +30,13 @@ class Rate {
   const Rate(this.maximum, this.period);
 
   /// Creates a rate limit per second.
-  factory Rate.perSecond(int maximum) =>
-      new Rate(maximum, new Duration(seconds: 1));
+  factory Rate.perSecond(int maximum) => Rate(maximum, Duration(seconds: 1));
 
   /// Creates a rate limit per minute.
-  factory Rate.perMinute(int maximum) =>
-      new Rate(maximum, new Duration(minutes: 1));
+  factory Rate.perMinute(int maximum) => Rate(maximum, Duration(minutes: 1));
 
   /// Creates a rate limit per hour.
-  factory Rate.perHour(int maximum) =>
-      new Rate(maximum, new Duration(hours: 1));
+  factory Rate.perHour(int maximum) => Rate(maximum, Duration(hours: 1));
 
   @override
   bool operator ==(Object other) =>
@@ -63,10 +60,10 @@ abstract class Executor {
 
   /// Async task executor.
   factory Executor({
-    int concurrency: 1,
+    int concurrency = 1,
     Rate rate,
   }) =>
-      new _Executor(concurrency, rate);
+      _Executor(concurrency, rate);
 
   /// The number of tasks that are currently running.
   int get runningCount;
@@ -89,7 +86,7 @@ abstract class Executor {
   /// complete.
   ///
   /// If [withWaiting] is set, it will include the waiting tasks too.
-  Future join({bool withWaiting: false});
+  Future join({bool withWaiting = false});
 
   /// Notifies the listeners about a state change in [Executor], for example:
   /// - one or more tasks have started
@@ -99,6 +96,6 @@ abstract class Executor {
   /// ensure [Executor] is running on full capacity.
   Stream get onChange;
 
-  /// Closes the executor and reject new tasks.
+  /// Closes the executor and reject  tasks.
   Future close();
 }

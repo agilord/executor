@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0
+
+- Removed `new` keyword, and updated to follow `package:pedantic` rules.
+- `Executor.join` will register `Future.catchError` on task futures, preventing
+  uncaught exceptions from blocking further execution.
+
 ## 2.1.2
 
 - Using `package:stack_trace` to chain async stacktraces when task fails.

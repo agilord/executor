@@ -3,10 +3,10 @@ part of executor;
 class _Executor implements Executor {
   int _concurrency;
   Rate _rate;
-  final ListQueue<_Item> _waiting = new ListQueue<_Item>();
-  final ListQueue<_Item> _running = new ListQueue<_Item>();
-  final ListQueue<DateTime> _started = new ListQueue<DateTime>();
-  final StreamController _onChangeController = new StreamController.broadcast();
+  final ListQueue<_Item> _waiting = ListQueue<_Item>();
+  final ListQueue<_Item> _running = ListQueue<_Item>();
+  final ListQueue<DateTime> _started = ListQueue<DateTime>();
+  final StreamController _onChangeController = StreamController.broadcast();
   Future _runFuture;
   bool _closing = false;
   Completer _notifyCompleter;
@@ -51,29 +51,28 @@ class _Executor implements Executor {
 
   @override
   Future<R> scheduleTask<R>(AsyncTask<R> task) async {
-    if (isClosing) throw new Exception('Executor doesn\'t accept new tasks.');
-    final item = new _Item();
+    if (isClosing) throw Exception('Executor doesn\'t accept  tasks.');
+    final item = _Item<R>();
     _waiting.add(item);
     _doNotify();
     await item.trigger.future;
-    final completer = Completer<R>();
     try {
       final r = await task();
-      completer.complete(r);
+      item.result.complete(r);
     } catch (e, st) {
-      final chain = new Chain([new Trace.from(st), new Trace.current(1)]);
-      completer.completeError(e, chain);
+      final chain = Chain([Trace.from(st), Trace.current(1)]);
+      item.result.completeError(e, chain);
     }
-    item.finalizer.complete();
     _doNotify();
-    return completer.future;
+    item.remove.complete();
+    return item.result.future;
   }
 
   @override
   Stream<R> scheduleStream<R>(StreamTask<R> task) {
     StreamController<R> streamController;
     StreamSubscription<R> streamSubscription;
-    final Completer resourceCompleter = new Completer();
+    final Completer resourceCompleter = Completer();
     final complete = () {
       if (streamSubscription != null) {
         streamSubscription.cancel();
@@ -88,11 +87,11 @@ class _Executor implements Executor {
     };
     final completeWithError = (e, st) {
       if (!streamController.isClosed) {
-        streamController.addError(e, st);
+        streamController.addError(e, st as StackTrace);
       }
       complete();
     };
-    streamController = new StreamController<R>(
+    streamController = StreamController<R>(
         onCancel: complete,
         onPause: () => streamSubscription?.pause(),
         onResume: () => streamSubscription?.resume());
@@ -117,17 +116,17 @@ class _Executor implements Executor {
   }
 
   @override
-  Future join({bool withWaiting: false}) {
+  Future join({bool withWaiting = false}) {
     final List<Future> futures = [];
     for (_Item item in _running) {
-      futures.add(item.finalizer.future.whenComplete(() => null));
+      futures.add(item.result.future.catchError((_) async => null));
     }
     if (withWaiting) {
       for (_Item item in _waiting) {
-        futures.add(item.finalizer.future.whenComplete(() => null));
+        futures.add(item.result.future.catchError((_) async => null));
       }
     }
-    if (futures.isEmpty) return new Future.value();
+    if (futures.isEmpty) return Future.value();
     return Future.wait(futures);
   }
 
@@ -152,7 +151,7 @@ class _Executor implements Executor {
         continue;
       }
       if (_rate != null) {
-        final DateTime now = new DateTime.now();
+        final DateTime now = DateTime.now();
         final DateTime limitStart = now.subtract(_rate.period);
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
@@ -162,7 +161,7 @@ class _Executor implements Executor {
           final last = now.difference(_started.last);
           if (gap > last) {
             final diff = gap - last;
-            _notifyTimer ??= new Timer(diff, _doNotify);
+            _notifyTimer ??= Timer(diff, _doNotify);
             await _waitForNotify();
             continue;
           }
@@ -172,7 +171,7 @@ class _Executor implements Executor {
       final _Item item = _waiting.removeFirst();
       _running.add(item);
       // ignore: unawaited_futures
-      item.finalizer.future.whenComplete(() {
+      item.remove.future.whenComplete(() {
         _running.remove(item);
         _doNotify();
         if (!_closing &&
@@ -194,7 +193,7 @@ class _Executor implements Executor {
   }
 
   Future _waitForNotify() async {
-    _notifyCompleter = new Completer();
+    _notifyCompleter = Completer();
     await _notifyCompleter.future;
     _notifyCompleter = null;
     _notifyTimer?.cancel();
@@ -202,7 +201,8 @@ class _Executor implements Executor {
   }
 }
 
-class _Item {
-  final Completer trigger = new Completer();
-  final Completer finalizer = new Completer();
+class _Item<R> {
+  final trigger = Completer();
+  final result = Completer<R>();
+  final remove = Completer();
 }
