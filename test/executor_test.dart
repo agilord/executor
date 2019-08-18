@@ -33,8 +33,8 @@ void main() {
       // ignore: unawaited_futures
       executor.scheduleTask(() => third.future);
 
-      expect(executor.runningCount, 0);
-      expect(executor.waitingCount, 3);
+      expect(executor.runningCount, 2);
+      expect(executor.waitingCount, 1);
       expect(executor.scheduledCount, 3);
 
       await Future.delayed(Duration(milliseconds: 100));
@@ -72,6 +72,31 @@ void main() {
       }
       await executor.join(withWaiting: true);
       await executor.close();
+    });
+
+    test('Rate limiting', () async {
+      final executor = Executor(concurrency: 2, rate: Rate.perSecond(3));
+      final sw = Stopwatch()..start();
+      final running = <int>[];
+      final times = <int>[];
+      for (int i = 0; i < 10; i++) {
+        // ignore: unawaited_futures
+        executor.scheduleTask(() async {
+          running.add(executor.runningCount);
+          times.add(sw.elapsedMilliseconds);
+          await Future.delayed(Duration(seconds: 1));
+        });
+      }
+      await executor.join(withWaiting: true);
+      expect(running, [1, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
+      for (int i = 0; i < 10; i += 2) {
+        expect(times[i + 1] - times[i], greaterThan(320));
+        expect(times[i + 1] - times[i], lessThan(360));
+      }
+      for (int i = 0; i < 8; i += 2) {
+        expect(times[i + 2] - times[i], greaterThan(950));
+        expect(times[i + 2] - times[i], lessThan(1050));
+      }
     });
   });
 

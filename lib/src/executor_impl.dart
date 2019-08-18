@@ -7,14 +7,11 @@ class _Executor implements Executor {
   final ListQueue<_Item> _running = ListQueue<_Item>();
   final ListQueue<DateTime> _started = ListQueue<DateTime>();
   final StreamController _onChangeController = StreamController.broadcast();
-  Future _runFuture;
   bool _closing = false;
-  Completer _notifyCompleter;
-  Timer _notifyTimer;
+  Timer _triggerTimer;
 
   _Executor(this._concurrency, this._rate) {
     assert(_concurrency > 0);
-    _runFuture = _run();
   }
 
   @override
@@ -36,7 +33,7 @@ class _Executor implements Executor {
     if (_concurrency == value) return;
     assert(value > 0);
     _concurrency = value;
-    _doNotify();
+    _trigger();
   }
 
   @override
@@ -46,7 +43,7 @@ class _Executor implements Executor {
   set rate(Rate value) {
     if (_rate == value) return;
     _rate = value;
-    _doNotify();
+    _trigger();
   }
 
   @override
@@ -54,17 +51,22 @@ class _Executor implements Executor {
     if (isClosing) throw Exception('Executor doesn\'t accept  tasks.');
     final item = _Item<R>();
     _waiting.add(item);
-    _doNotify();
+    _trigger();
     await item.trigger.future;
-    try {
-      final r = await task();
-      item.result.complete(r);
-    } catch (e, st) {
-      final chain = Chain([Trace.from(st), Trace.current(1)]);
-      item.result.completeError(e, chain);
+    if (isClosing) {
+      item.result.completeError(
+          TimeoutException('Executor is closing'), Trace.current(1));
+    } else {
+      try {
+        final r = await task();
+        item.result.complete(r);
+      } catch (e, st) {
+        final chain = Chain([Trace.from(st), Trace.current(1)]);
+        item.result.completeError(e, chain);
+      }
     }
-    _doNotify();
-    item.remove.complete();
+    _trigger();
+    item.done.complete();
     return item.result.future;
   }
 
@@ -136,23 +138,20 @@ class _Executor implements Executor {
   @override
   Future close() async {
     _closing = true;
-    _doNotify();
-    await _runFuture;
+    _trigger();
+    await join(withWaiting: true);
+    _triggerTimer?.cancel();
     await _onChangeController.close();
   }
 
-  Future _run() async {
-    for (;;) {
-      if (isClosing && _waiting.isEmpty && _running.isEmpty) {
-        return;
-      }
-      if (_waiting.isEmpty || _running.length >= _concurrency) {
-        await _waitForNotify();
-        continue;
-      }
+  void _trigger() {
+    _triggerTimer?.cancel();
+    _triggerTimer = null;
+
+    while (_running.length < _concurrency && _waiting.isNotEmpty) {
       if (_rate != null) {
-        final DateTime now = DateTime.now();
-        final DateTime limitStart = now.subtract(_rate.period);
+        final now = DateTime.now();
+        final limitStart = now.subtract(_rate.period);
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
         }
@@ -161,19 +160,18 @@ class _Executor implements Executor {
           final last = now.difference(_started.last);
           if (gap > last) {
             final diff = gap - last;
-            _notifyTimer ??= Timer(diff, _doNotify);
-            await _waitForNotify();
-            continue;
+            _triggerTimer ??= Timer(diff, _trigger);
+            return;
           }
         }
         _started.add(now);
       }
-      final _Item item = _waiting.removeFirst();
+
+      final item = _waiting.removeFirst();
       _running.add(item);
-      // ignore: unawaited_futures
-      item.remove.future.whenComplete(() {
+      item.done.future.whenComplete(() {
         _running.remove(item);
-        _doNotify();
+        _trigger();
         if (!_closing &&
             _onChangeController.hasListener &&
             !_onChangeController.isClosed) {
@@ -181,28 +179,12 @@ class _Executor implements Executor {
         }
       });
       item.trigger.complete();
-      _doNotify();
     }
-  }
-
-  void _doNotify() {
-    _notifyCompleter?.complete();
-    _notifyCompleter = null;
-    _notifyTimer?.cancel();
-    _notifyTimer = null;
-  }
-
-  Future _waitForNotify() async {
-    _notifyCompleter = Completer();
-    await _notifyCompleter.future;
-    _notifyCompleter = null;
-    _notifyTimer?.cancel();
-    _notifyTimer = null;
   }
 }
 
 class _Item<R> {
   final trigger = Completer();
   final result = Completer<R>();
-  final remove = Completer();
+  final done = Completer();
 }

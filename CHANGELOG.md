@@ -5,6 +5,7 @@
 - Removed `new` keyword, and updated to follow `package:pedantic` rules.
 - `Executor.join` will register `Future.catchError` on task futures, preventing
   uncaught exceptions from blocking further execution.
+- Simplified execution and trigger mechanism.
 
 ## 2.1.2
 
