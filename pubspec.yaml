@@ -1,13 +1,13 @@
 name: executor
 description: >
   Executes async tasks with a configurable maximum concurrency and rate.
-version: 2.2.0
+version: 2.2.1
 author: Istvan Soos <istvan.soos@agilord.com>
 
 homepage: https://github.com/agilord/executor
 
 environment:
-  sdk: ">=2.4.0 <3.0.0"
+  sdk: ">=2.7.0 <3.0.0"
 
 dependencies:
   stack_trace: '>=1.9.0 <2.0.0'

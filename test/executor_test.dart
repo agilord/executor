@@ -8,19 +8,21 @@ void main() {
   group('AsyncTask', () {
     test('does not run after closing', () async {
       final executor = Executor();
-      final Future<int> resultFuture =
+      final resultFuture =
           executor.scheduleTask(() => Future.microtask(() => 12));
-      expect(resultFuture, completion(12));
 
+      await Future.delayed(Duration.zero);
       await executor.close();
+      expect(await resultFuture, 12);
+
       expect(() => executor.scheduleTask(() => 0), throwsException);
     });
 
     test('concurrency limit', () async {
       final executor = Executor(concurrency: 2);
-      final Completer first = Completer();
-      final Completer second = Completer();
-      final Completer third = Completer();
+      final first = Completer();
+      final second = Completer();
+      final third = Completer();
 
       expect(executor.runningCount, 0);
       expect(executor.waitingCount, 0);
@@ -63,7 +65,7 @@ void main() {
 
     test('Exceptions do not block further execution.', () async {
       final executor = Executor(concurrency: 2);
-      for (int i = 0; i < 10; i++) {
+      for (var i = 0; i < 10; i++) {
         // ignore: unawaited_futures
         executor.scheduleTask(() async {
           await Future.delayed(Duration(microseconds: i * 10));
@@ -79,7 +81,7 @@ void main() {
       final sw = Stopwatch()..start();
       final running = <int>[];
       final times = <int>[];
-      for (int i = 0; i < 10; i++) {
+      for (var i = 0; i < 10; i++) {
         // ignore: unawaited_futures
         executor.scheduleTask(() async {
           running.add(executor.runningCount);
@@ -89,11 +91,11 @@ void main() {
       }
       await executor.join(withWaiting: true);
       expect(running, [1, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
-      for (int i = 0; i < 10; i += 2) {
+      for (var i = 0; i < 10; i += 2) {
         expect(times[i + 1] - times[i], greaterThan(320));
         expect(times[i + 1] - times[i], lessThan(360));
       }
-      for (int i = 0; i < 8; i += 2) {
+      for (var i = 0; i < 8; i += 2) {
         expect(times[i + 2] - times[i], greaterThan(950));
         expect(times[i + 2] - times[i], lessThan(1050));
       }
@@ -103,10 +105,9 @@ void main() {
   group('StreamTask', () {
     test('completes only after the stream closes', () async {
       final executor = Executor();
-      final StreamController controller = StreamController();
-      final Stream resultStream =
-          executor.scheduleStream(() => controller.stream);
-      final Future<List> resultList = resultStream.toList();
+      final controller = StreamController();
+      final resultStream = executor.scheduleStream(() => controller.stream);
+      final resultList = resultStream.toList();
 
       await Future.delayed(Duration(milliseconds: 100));
       expect(executor.runningCount, 1);

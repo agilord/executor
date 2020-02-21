@@ -65,6 +65,7 @@ class _Executor implements Executor {
         item.result.completeError(e, chain);
       }
     }
+    _running.remove(item);
     _trigger();
     item.done.complete();
     return item.result.future;
@@ -74,7 +75,7 @@ class _Executor implements Executor {
   Stream<R> scheduleStream<R>(StreamTask<R> task) {
     StreamController<R> streamController;
     StreamSubscription<R> streamSubscription;
-    final Completer resourceCompleter = Completer();
+    final resourceCompleter = Completer();
     final complete = () {
       if (streamSubscription != null) {
         streamSubscription.cancel();
@@ -100,7 +101,7 @@ class _Executor implements Executor {
     scheduleTask(() {
       if (resourceCompleter.isCompleted) return null;
       try {
-        final Stream<R> stream = task();
+        final stream = task();
         if (stream == null) {
           complete();
           return null;
@@ -119,12 +120,12 @@ class _Executor implements Executor {
 
   @override
   Future join({bool withWaiting = false}) {
-    final List<Future> futures = [];
-    for (_Item item in _running) {
+    final futures = <Future>[];
+    for (final item in _running) {
       futures.add(item.result.future.catchError((_) async => null));
     }
     if (withWaiting) {
-      for (_Item item in _waiting) {
+      for (final item in _waiting) {
         futures.add(item.result.future.catchError((_) async => null));
       }
     }
@@ -170,7 +171,6 @@ class _Executor implements Executor {
       final item = _waiting.removeFirst();
       _running.add(item);
       item.done.future.whenComplete(() {
-        _running.remove(item);
         _trigger();
         if (!_closing &&
             _onChangeController.hasListener &&

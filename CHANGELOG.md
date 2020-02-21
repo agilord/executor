@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.1
+
+- Updated code to Dart 2.7.0 and latest lints.
+- Fix: task completion updates the running count immediately.
+
 ## 2.2.0
 
 - Removed `new` keyword, and updated to follow `package:pedantic` rules.

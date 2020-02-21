@@ -13,10 +13,10 @@ import 'package:stack_trace/stack_trace.dart';
 part './src/executor_impl.dart';
 
 /// An async task that completes with a Future or a value.
-typedef FutureOr<R> AsyncTask<R>();
+typedef AsyncTask<R> = FutureOr<R> Function();
 
 /// An async task that completes after the Stream is closed.
-typedef Stream<R> StreamTask<R>();
+typedef StreamTask<R> = Stream<R> Function();
 
 /// No more than [maximum] tasks can be started over any given [period].
 class Rate {

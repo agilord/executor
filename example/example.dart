@@ -6,12 +6,16 @@ import 'dart:async';
 import 'package:executor/executor.dart';
 
 Future main() async {
-  Executor executor = new Executor(concurrency: 10);
+  final executor = Executor(concurrency: 10);
   // only 10 of them will be running at a time
-  for (int i = 0; i < 20; i++) {
+  for (var i = 0; i < 20; i++) {
+    // ignore: unawaited_futures
     executor.scheduleTask(() async {
       // await longDatabaseTask()
       // await anotherProcessing()
     });
   }
+
+  await executor.join(withWaiting: true);
+  await executor.close();
 }
