@@ -13,10 +13,10 @@ import 'package:stack_trace/stack_trace.dart';
 part './src/executor_impl.dart';
 
 /// An async task that completes with a Future or a value.
-typedef AsyncTask<R> = FutureOr<R> Function();
+typedef AsyncTask<R> = FutureOr<R>? Function();
 
 /// An async task that completes after the Stream is closed.
-typedef StreamTask<R> = Stream<R> Function();
+typedef StreamTask<R> = Stream<R>? Function();
 
 /// No more than [maximum] tasks can be started over any given [period].
 class Rate {
@@ -53,15 +53,15 @@ class Rate {
 /// Executes async tasks with a configurable maximum [concurrency] and [rate].
 abstract class Executor {
   /// The maximum number of tasks running concurrently.
-  int concurrency;
+  int concurrency = 1;
 
   /// The maximum rate of how frequently tasks can be started.
-  Rate rate;
+  Rate? rate;
 
   /// Async task executor.
   factory Executor({
     int concurrency = 1,
-    Rate rate,
+    Rate? rate,
   }) =>
       _Executor(concurrency, rate);
 

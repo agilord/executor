@@ -2,13 +2,13 @@ part of executor;
 
 class _Executor implements Executor {
   int _concurrency;
-  Rate _rate;
+  Rate? _rate;
   final ListQueue<_Item> _waiting = ListQueue<_Item>();
   final ListQueue<_Item> _running = ListQueue<_Item>();
   final ListQueue<DateTime> _started = ListQueue<DateTime>();
   final StreamController _onChangeController = StreamController.broadcast();
   bool _closing = false;
-  Timer _triggerTimer;
+  Timer? _triggerTimer;
 
   _Executor(this._concurrency, this._rate) {
     assert(_concurrency > 0);
@@ -37,10 +37,10 @@ class _Executor implements Executor {
   }
 
   @override
-  Rate get rate => _rate;
+  Rate? get rate => _rate;
 
   @override
-  set rate(Rate value) {
+  set rate(Rate? value) {
     if (_rate == value) return;
     _rate = value;
     _trigger();
@@ -73,12 +73,12 @@ class _Executor implements Executor {
 
   @override
   Stream<R> scheduleStream<R>(StreamTask<R> task) {
-    StreamController<R> streamController;
-    StreamSubscription<R> streamSubscription;
+    final streamController = StreamController<R>();
+    StreamSubscription<R>? streamSubscription;
     final resourceCompleter = Completer();
     final complete = () {
       if (streamSubscription != null) {
-        streamSubscription.cancel();
+        streamSubscription?.cancel();
         streamSubscription = null;
       }
       if (!resourceCompleter.isCompleted) {
@@ -90,14 +90,14 @@ class _Executor implements Executor {
     };
     final completeWithError = (e, st) {
       if (!streamController.isClosed) {
-        streamController.addError(e, st as StackTrace);
+        streamController.addError(e as Object, st as StackTrace);
       }
       complete();
     };
-    streamController = StreamController<R>(
-        onCancel: complete,
-        onPause: () => streamSubscription?.pause(),
-        onResume: () => streamSubscription?.resume());
+    streamController
+      ..onCancel = complete
+      ..onPause = (() => streamSubscription?.pause())
+      ..onResume = () => streamSubscription?.resume();
     scheduleTask(() {
       if (resourceCompleter.isCompleted) return null;
       try {
@@ -150,14 +150,15 @@ class _Executor implements Executor {
     _triggerTimer = null;
 
     while (_running.length < _concurrency && _waiting.isNotEmpty) {
-      if (_rate != null) {
+      final rate = _rate;
+      if (rate != null) {
         final now = DateTime.now();
-        final limitStart = now.subtract(_rate.period);
+        final limitStart = now.subtract(rate.period);
         while (_started.isNotEmpty && _started.first.isBefore(limitStart)) {
           _started.removeFirst();
         }
         if (_started.isNotEmpty) {
-          final gap = _rate.period ~/ _rate.maximum;
+          final gap = rate.period ~/ rate.maximum;
           final last = now.difference(_started.last);
           if (gap > last) {
             final diff = gap - last;
