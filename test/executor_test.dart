@@ -69,7 +69,7 @@ void main() {
         // ignore: unawaited_futures
         executor.scheduleTask(() async {
           await Future.delayed(Duration(microseconds: i * 10));
-          await Future.microtask(() => throw Exception());
+          await Future<Null>.microtask(() => throw Exception());
         });
       }
       await executor.join(withWaiting: true);
