@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2
+
+- Migrated to null safety (by [swdyh](https://github.com/swdyh))
+
 ## 2.2.1
 
 - Updated code to Dart 2.7.0 and latest lints.
