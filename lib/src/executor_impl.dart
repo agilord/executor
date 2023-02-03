@@ -71,7 +71,7 @@ class _Executor implements Executor {
     return await item.result.future
         // Nullable R is used to allow using catchError with null output, so
         // we must convert R? into R for the caller
-        .then((v) => v ?? v as R);
+        .then((v) => v as R);
   }
 
   @override
