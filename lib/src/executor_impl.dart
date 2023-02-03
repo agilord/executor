@@ -119,8 +119,8 @@ class _Executor implements Executor {
   }
 
   @override
-  Future join({bool withWaiting = false}) {
-    final futures = <Future>[];
+  Future<List<Object?>> join({bool withWaiting = false}) {
+    final futures = <Future<Object?>>[];
     for (final item in _running) {
       futures.add(item.result.future.catchError((_) async => null));
     }
@@ -129,7 +129,7 @@ class _Executor implements Executor {
         futures.add(item.result.future.catchError((_) async => null));
       }
     }
-    if (futures.isEmpty) return Future.value();
+    if (futures.isEmpty) return Future.value([]);
     return Future.wait(futures);
   }
 
