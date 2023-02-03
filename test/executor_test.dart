@@ -81,11 +81,11 @@ void main() {
         await executor.close();
       }
 
-      test('Nullable return type)', () async {
+      test('Nullable return type', () async {
         await testForType<int?>(defaultValue: 1);
       });
 
-      test('Non-nullable return type)', () async {
+      test('Non-nullable return type', () async {
         await testForType<int>(defaultValue: 1);
       });
     });
