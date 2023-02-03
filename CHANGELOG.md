@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.3
+
+- Fix tasks with non-nullable return types when an error is thrown.
+
 ## 2.2.2
 
 - Migrated to null safety (by [swdyh](https://github.com/swdyh))
