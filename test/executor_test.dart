@@ -79,7 +79,7 @@ void main() {
         }
         final taskResults = await executor.join(withWaiting: true);
 
-        // All the items failed, so they contain null
+        // All the tasks throw, so the output is null
         expect(taskResults.length, 10);
         expect(taskResults, everyElement(null));
 
