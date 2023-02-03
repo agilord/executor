@@ -3,8 +3,8 @@ part of executor;
 class _Executor implements Executor {
   int _concurrency;
   Rate? _rate;
-  final ListQueue<_Item> _waiting = ListQueue<_Item>();
-  final ListQueue<_Item> _running = ListQueue<_Item>();
+  final ListQueue<_Item<Object?>> _waiting = ListQueue<_Item<Object?>>();
+  final ListQueue<_Item<Object?>> _running = ListQueue<_Item<Object?>>();
   final ListQueue<DateTime> _started = ListQueue<DateTime>();
   final StreamController _onChangeController = StreamController.broadcast();
   bool _closing = false;
@@ -49,7 +49,7 @@ class _Executor implements Executor {
   @override
   Future<R> scheduleTask<R>(AsyncTask<R> task) async {
     if (isClosing) throw Exception('Executor doesn\'t accept  tasks.');
-    final item = _Item<R>();
+    final item = _Item<R?>();
     _waiting.add(item);
     _trigger();
     await item.trigger.future;
@@ -68,7 +68,10 @@ class _Executor implements Executor {
     _running.remove(item);
     _trigger();
     item.done.complete();
-    return item.result.future;
+    return await item.result.future
+        // Nullable R is used to allow using catchError with null output, so
+        // we must convert R? into R for the caller
+        .then((v) => v as R);
   }
 
   @override
@@ -119,8 +122,8 @@ class _Executor implements Executor {
   }
 
   @override
-  Future join({bool withWaiting = false}) {
-    final futures = <Future>[];
+  Future<List<Object?>> join({bool withWaiting = false}) {
+    final futures = <Future<Object?>>[];
     for (final item in _running) {
       futures.add(item.result.future.catchError((_) async => null));
     }
@@ -129,7 +132,7 @@ class _Executor implements Executor {
         futures.add(item.result.future.catchError((_) async => null));
       }
     }
-    if (futures.isEmpty) return Future.value();
+    if (futures.isEmpty) return Future.value([]);
     return Future.wait(futures);
   }
 
@@ -186,6 +189,7 @@ class _Executor implements Executor {
 
 class _Item<R> {
   final trigger = Completer();
-  final result = Completer<R>();
+  // Nullable R is used here so that we can return null during catchError
+  final result = Completer<R?>();
   final done = Completer();
 }

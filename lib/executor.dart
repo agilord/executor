@@ -86,7 +86,7 @@ abstract class Executor {
   /// complete.
   ///
   /// If [withWaiting] is set, it will include the waiting tasks too.
-  Future join({bool withWaiting = false});
+  Future<List<Object?>> join({bool withWaiting = false});
 
   /// Notifies the listeners about a state change in [Executor], for example:
   /// - one or more tasks have started

@@ -63,17 +63,36 @@ void main() {
       expect(executor.scheduledCount, 0);
     });
 
-    test('Exceptions do not block further execution.', () async {
-      final executor = Executor(concurrency: 2);
-      for (var i = 0; i < 10; i++) {
-        // ignore: unawaited_futures
-        executor.scheduleTask(() async {
-          await Future.delayed(Duration(microseconds: i * 10));
-          await Future<Null>.microtask(() => throw Exception());
-        });
+    group('Exceptions do not block further execution', () {
+      Future<void> testForType<T>({required T defaultValue}) async {
+        final executor = Executor(concurrency: 2);
+        for (var i = 0; i < 10; i++) {
+          executor.scheduleTask<T>(() async {
+            await Future.delayed(Duration(microseconds: i * 10));
+            await Future<Null>.microtask(() => throw Exception());
+
+            // Some arbitrary value to match the task type
+            return defaultValue;
+          }) //
+              // We don't want the failed tasks to leak into the dart test
+              .ignore();
+        }
+        final taskResults = await executor.join(withWaiting: true);
+
+        // All the tasks throw, so the output is null
+        expect(taskResults.length, 10);
+        expect(taskResults, everyElement(null));
+
+        await executor.close();
       }
-      await executor.join(withWaiting: true);
-      await executor.close();
+
+      test('Nullable return type', () async {
+        await testForType<int?>(defaultValue: 1);
+      });
+
+      test('Non-nullable return type', () async {
+        await testForType<int>(defaultValue: 1);
+      });
     });
 
     test('Rate limiting', () async {
