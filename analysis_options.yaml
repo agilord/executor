@@ -1,5 +1,5 @@
 #   https://www.dartlang.org/guides/language/analysis-options
-include: package:pedantic/analysis_options.yaml
+include: package:lints/recommended.yaml
 
 analyzer:
   errors:

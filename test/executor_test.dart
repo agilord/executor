@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:test/test.dart';
-
 import 'package:executor/executor.dart';
+import 'package:test/test.dart';
 
 void main() {
   group('AsyncTask', () {
@@ -69,7 +68,7 @@ void main() {
         for (var i = 0; i < 10; i++) {
           executor.scheduleTask<T>(() async {
             await Future.delayed(Duration(microseconds: i * 10));
-            await Future<Null>.microtask(() => throw Exception());
+            await Future<void>.microtask(() => throw Exception());
 
             // Some arbitrary value to match the task type
             return defaultValue;
