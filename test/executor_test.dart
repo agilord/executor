@@ -77,7 +77,12 @@ void main() {
               // We don't want the failed tasks to leak into the dart test
               .ignore();
         }
-        await executor.join(withWaiting: true);
+        final taskResults = await executor.join(withWaiting: true);
+
+        // All the items failed, so they contain null
+        expect(taskResults.length, 10);
+        expect(taskResults, everyElement(null));
+
         await executor.close();
       }
 
