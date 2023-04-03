@@ -3,10 +3,12 @@ part of executor;
 class _Executor implements Executor {
   int _concurrency;
   Rate? _rate;
-  final DoubleLinkedQueue<_Item<Object?>> _waiting = DoubleLinkedQueue<_Item<Object?>>();
+  final DoubleLinkedQueue<_Item<Object?>> _waiting =
+      DoubleLinkedQueue<_Item<Object?>>();
   final ListQueue<_Item<Object?>> _running = ListQueue<_Item<Object?>>();
   final ListQueue<DateTime> _started = ListQueue<DateTime>();
-  final HashMap<Object, List<_Item<Object?>>> _flagItems = HashMap<Object, List<_Item<Object?>>>();
+  final HashMap<Object, List<_Item<Object?>>> _flagItems =
+      HashMap<Object, List<_Item<Object?>>>();
   final StreamController _onChangeController = StreamController.broadcast();
   bool _closing = false;
   Timer? _triggerTimer;
@@ -72,7 +74,8 @@ class _Executor implements Executor {
     _trigger();
     await item.trigger.future;
     if (isClosing) {
-      item.result.completeError(TimeoutException('Executor is closing'), Trace.current(1));
+      item.result.completeError(
+          TimeoutException('Executor is closing'), Trace.current(1));
     } else {
       try {
         final r = await task();
@@ -129,7 +132,10 @@ class _Executor implements Executor {
             complete();
             return null;
           }
-          streamSubscription = stream.listen(streamController.add, onError: streamController.addError, onDone: complete, cancelOnError: true);
+          streamSubscription = stream.listen(streamController.add,
+              onError: streamController.addError,
+              onDone: complete,
+              cancelOnError: true);
         } catch (e, st) {
           completeWithError(e, st);
         }
@@ -202,7 +208,9 @@ class _Executor implements Executor {
       _running.add(item);
       item.done.future.whenComplete(() {
         _trigger();
-        if (!_closing && _onChangeController.hasListener && !_onChangeController.isClosed) {
+        if (!_closing &&
+            _onChangeController.hasListener &&
+            !_onChangeController.isClosed) {
           _onChangeController.add(null);
         }
       });

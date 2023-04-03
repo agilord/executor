@@ -7,7 +7,8 @@ void main() {
   group('AsyncTask', () {
     test('does not run after closing', () async {
       final executor = Executor();
-      final resultFuture = executor.scheduleTask(() => Future.microtask(() => 12));
+      final resultFuture =
+          executor.scheduleTask(() => Future.microtask(() => 12));
 
       await Future.delayed(Duration.zero);
       await executor.close();
