@@ -3,9 +3,10 @@ part of executor;
 class _Executor implements Executor {
   int _concurrency;
   Rate? _rate;
-  final ListQueue<_Item<Object?>> _waiting = ListQueue<_Item<Object?>>();
+  final DoubleLinkedQueue<_Item<Object?>> _waiting = DoubleLinkedQueue<_Item<Object?>>();
   final ListQueue<_Item<Object?>> _running = ListQueue<_Item<Object?>>();
   final ListQueue<DateTime> _started = ListQueue<DateTime>();
+  final HashMap<Object, List<_Item<Object?>>> _flagItems = HashMap<Object, List<_Item<Object?>>>();
   final StreamController _onChangeController = StreamController.broadcast();
   bool _closing = false;
   Timer? _triggerTimer;
@@ -47,15 +48,31 @@ class _Executor implements Executor {
   }
 
   @override
-  Future<R> scheduleTask<R>(AsyncTask<R> task) async {
+  void moveToFirst(Object flag) {
+    _flagItems[flag]?.forEach(_moveToFirst);
+  }
+
+  @override
+  Future<R> scheduleTask<R>(AsyncTask<R> task, {Object? flag}) async {
     if (isClosing) throw Exception('Executor doesn\'t accept  tasks.');
     final item = _Item<R?>();
     _waiting.add(item);
+    item.doubleLinkedQueueEntry = _waiting.lastEntry();
+    if (flag != null) {
+      _flagItems[flag] ??= [];
+      _flagItems[flag]!.add(item);
+      item.removeFlagMapFunc = () {
+        if (_flagItems[flag]?.length == 1 && _flagItems[flag]?.first == item) {
+          _flagItems.remove(flag);
+        } else {
+          _flagItems[flag]?.remove(item);
+        }
+      };
+    }
     _trigger();
     await item.trigger.future;
     if (isClosing) {
-      item.result.completeError(
-          TimeoutException('Executor is closing'), Trace.current(1));
+      item.result.completeError(TimeoutException('Executor is closing'), Trace.current(1));
     } else {
       try {
         final r = await task();
@@ -75,7 +92,7 @@ class _Executor implements Executor {
   }
 
   @override
-  Stream<R> scheduleStream<R>(StreamTask<R> task) {
+  Stream<R> scheduleStream<R>(StreamTask<R> task, {Object? flag}) {
     final streamController = StreamController<R>();
     StreamSubscription<R>? streamSubscription;
     final resourceCompleter = Completer();
@@ -103,23 +120,23 @@ class _Executor implements Executor {
       ..onCancel = complete
       ..onPause = (() => streamSubscription?.pause())
       ..onResume = () => streamSubscription?.resume();
-    scheduleTask(() {
-      if (resourceCompleter.isCompleted) return null;
-      try {
-        final stream = task();
-        if (stream == null) {
-          complete();
-          return null;
+    scheduleTask(
+      () {
+        if (resourceCompleter.isCompleted) return null;
+        try {
+          final stream = task();
+          if (stream == null) {
+            complete();
+            return null;
+          }
+          streamSubscription = stream.listen(streamController.add, onError: streamController.addError, onDone: complete, cancelOnError: true);
+        } catch (e, st) {
+          completeWithError(e, st);
         }
-        streamSubscription = stream.listen(streamController.add,
-            onError: streamController.addError,
-            onDone: complete,
-            cancelOnError: true);
-      } catch (e, st) {
-        completeWithError(e, st);
-      }
-      return resourceCompleter.future;
-    }).catchError(completeWithError);
+        return resourceCompleter.future;
+      },
+      flag: flag,
+    ).catchError(completeWithError);
     return streamController.stream;
   }
 
@@ -150,6 +167,12 @@ class _Executor implements Executor {
     await _onChangeController.close();
   }
 
+  void _moveToFirst(_Item item) {
+    item.doubleLinkedQueueEntry?.remove();
+    _waiting.addFirst(item);
+    item.doubleLinkedQueueEntry = _waiting.firstEntry();
+  }
+
   void _trigger() {
     _triggerTimer?.cancel();
     _triggerTimer = null;
@@ -175,12 +198,11 @@ class _Executor implements Executor {
       }
 
       final item = _waiting.removeFirst();
+      item.removeFlagMapFunc?.call();
       _running.add(item);
       item.done.future.whenComplete(() {
         _trigger();
-        if (!_closing &&
-            _onChangeController.hasListener &&
-            !_onChangeController.isClosed) {
+        if (!_closing && _onChangeController.hasListener && !_onChangeController.isClosed) {
           _onChangeController.add(null);
         }
       });
@@ -194,4 +216,6 @@ class _Item<R> {
   // Nullable R is used here so that we can return null during catchError
   final result = Completer<R?>();
   final done = Completer();
+  DoubleLinkedQueueEntry<_Item<Object?>>? doubleLinkedQueueEntry;
+  void Function()? removeFlagMapFunc;
 }

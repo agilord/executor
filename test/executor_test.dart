@@ -7,8 +7,7 @@ void main() {
   group('AsyncTask', () {
     test('does not run after closing', () async {
       final executor = Executor();
-      final resultFuture =
-          executor.scheduleTask(() => Future.microtask(() => 12));
+      final resultFuture = executor.scheduleTask(() => Future.microtask(() => 12));
 
       await Future.delayed(Duration.zero);
       await executor.close();
@@ -118,6 +117,28 @@ void main() {
         expect(times[i + 2] - times[i], lessThan(1050));
       }
     });
+
+    test(
+      'move first',
+      () async {
+        final executor = Executor(concurrency: 3);
+        final results = [];
+        for (var i = 0; i < 10; i++) {
+          // ignore: unawaited_futures
+          executor.scheduleTask(
+            () async {
+              await Future.delayed(Duration(seconds: 1));
+              results.add(i);
+            },
+            flag: i,
+          );
+        }
+        executor.moveToFirst(9);
+        executor.moveToFirst(7);
+        await executor.join(withWaiting: true);
+        expect(results, [0, 1, 2, 7, 9, 3, 4, 5, 6, 8]);
+      },
+    );
   });
 
   group('StreamTask', () {

@@ -74,13 +74,16 @@ abstract class Executor {
   /// The total number of tasks scheduled ([runningCount] + [waitingCount]).
   int get scheduledCount;
 
+  /// Move the task with the specified [flag] to the first
+  void moveToFirst(Object flag);
+
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
-  Future<R> scheduleTask<R>(AsyncTask<R> task);
+  Future<R> scheduleTask<R>(AsyncTask<R> task, {Object? flag});
 
   /// Schedules an async task and returns its stream. The task is considered
   /// running until the stream is closed.
-  Stream<R> scheduleStream<R>(StreamTask<R> task);
+  Stream<R> scheduleStream<R>(StreamTask<R> task, {Object? flag});
 
   /// Returns a [Future] that completes when all currently running tasks
   /// complete.
