@@ -50,8 +50,10 @@ class _Executor implements Executor {
   }
 
   @override
-  void moveToFirst(Object flag) {
+  bool moveToFirst(Object flag) {
+    if(_flagItems[flag]?.isEmpty ?? true) return false;
     _flagItems[flag]?.forEach(_moveToFirst);
+    return true;
   }
 
   @override

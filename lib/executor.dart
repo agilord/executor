@@ -75,7 +75,7 @@ abstract class Executor {
   int get scheduledCount;
 
   /// Move the task with the specified [flag] to the first
-  void moveToFirst(Object flag);
+  bool moveToFirst(Object flag);
 
   /// Schedules an async task and returns with a future that completes when the
   /// task is finished. Task may not get executed immediately.
