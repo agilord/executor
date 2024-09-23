@@ -1,4 +1,4 @@
-part of executor;
+part of '../executor.dart';
 
 class _Executor implements Executor {
   int _concurrency;

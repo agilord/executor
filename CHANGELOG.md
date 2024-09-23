@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.4
+
+- Updated lints.
+
 ## 2.2.3
 
 - Fix tasks with non-nullable return types when an error is thrown. ([#4](https://github.com/agilord/executor/pull/4) by [davidmartos96](https://github.com/davidmartos96))
