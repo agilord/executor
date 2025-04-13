@@ -2,8 +2,7 @@
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
 /// Executes async tasks with a configurable maximum concurrency and rate.
-
-library executor;
+library;
 
 import 'dart:async';
 import 'dart:collection';
@@ -95,6 +94,9 @@ abstract class Executor {
   /// Clients can use this to monitor [scheduledCount] and queue more tasks to
   /// ensure [Executor] is running on full capacity.
   Stream get onChange;
+
+  /// Whether the executor is open and accepts tasks.
+  bool get isOpen;
 
   /// Closes the executor and reject  tasks.
   Future close();

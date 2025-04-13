@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.5
+
+- `isOpen` method to indicate if the `Executor` is still accepting tasks.
+
 ## 2.2.4
 
 - Updated lints.

@@ -23,7 +23,8 @@ class _Executor implements Executor {
   @override
   int get scheduledCount => runningCount + waitingCount;
 
-  bool get isClosing => _closing;
+  @override
+  bool get isOpen => !_closing;
 
   @override
   int get concurrency => _concurrency;
@@ -48,12 +49,12 @@ class _Executor implements Executor {
 
   @override
   Future<R> scheduleTask<R>(AsyncTask<R> task) async {
-    if (isClosing) throw Exception('Executor doesn\'t accept  tasks.');
+    if (_closing) throw Exception('Executor doesn\'t accept  tasks.');
     final item = _Item<R?>();
     _waiting.add(item);
     _trigger();
     await item.trigger.future;
-    if (isClosing) {
+    if (_closing) {
       item.result.completeError(
           TimeoutException('Executor is closing'), Trace.current(1));
     } else {
